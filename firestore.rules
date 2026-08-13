@@ -2,6 +2,8 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Unmatched paths are denied.
+
     function isSignedIn() {
       return request.auth != null;
     }
@@ -10,20 +12,183 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    function hasExactKeys(data, keys) {
+      return data.keys().hasOnly(keys) && data.keys().hasAll(keys);
+    }
+
+    function isBoundedString(value, maxLen) {
+      return value is string && value.size() <= maxLen;
+    }
+
+    function isIntInRange(value, min, max) {
+      return (value is int || value is float)
+        && value == int(value)
+        && value >= min
+        && value <= max;
+    }
+
+    function isHttpsUrlOrEmpty(value, maxLen) {
+      return value is string
+        && value.size() <= maxLen
+        && (value.size() == 0 || value.matches('^https://.+'));
+    }
+
+    function isOptionalHttpsUrl(value, maxLen) {
+      return value == null || isHttpsUrlOrEmpty(value, maxLen);
+    }
+
+    function isObjectiveId(id) {
+      return id in [
+        'decide',
+        'align',
+        'inform',
+        'ideate',
+        'status',
+        'review',
+        'problem_solve',
+        'plan'
+      ];
+    }
+
+    function isObjectiveIdOrEmpty(id) {
+      return id is string && (id.size() == 0 || isObjectiveId(id));
+    }
+
+    function isObjectiveIds(ids) {
+      return ids is list
+        && ids.size() <= 8
+        && ids.hasOnly([
+          'decide',
+          'align',
+          'inform',
+          'ideate',
+          'status',
+          'review',
+          'problem_solve',
+          'plan'
+        ]);
+    }
+
+    function isDocLink(item) {
+      return item is map
+        && item.keys().hasOnly(['label', 'url'])
+        && item.keys().size() == 2
+        && isBoundedString(item.label, 100)
+        && isHttpsUrlOrEmpty(item.url, 2000);
+    }
+
+    function isDocLinks(list) {
+      return list is list
+        && list.size() <= 10
+        && (list.size() < 1 || isDocLink(list[0]))
+        && (list.size() < 2 || isDocLink(list[1]))
+        && (list.size() < 3 || isDocLink(list[2]))
+        && (list.size() < 4 || isDocLink(list[3]))
+        && (list.size() < 5 || isDocLink(list[4]))
+        && (list.size() < 6 || isDocLink(list[5]))
+        && (list.size() < 7 || isDocLink(list[6]))
+        && (list.size() < 8 || isDocLink(list[7]))
+        && (list.size() < 9 || isDocLink(list[8]))
+        && (list.size() < 10 || isDocLink(list[9]));
+    }
+
+    function isUserFields(data) {
+      return hasExactKeys(data, ['displayName', 'email', 'photoURL', 'createdAt'])
+        && isBoundedString(data.displayName, 80)
+        && isBoundedString(data.email, 320)
+        && isOptionalHttpsUrl(data.photoURL, 2000)
+        && data.createdAt is timestamp;
+    }
+
+    function isMeetingFields(data) {
+      return hasExactKeys(data, [
+          'ownerId',
+          'title',
+          'description',
+          'scheduledAt',
+          'targetDurationMinutes',
+          'objectiveIds',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.ownerId is string
+        && isBoundedString(data.title, 200)
+        && isBoundedString(data.description, 5000)
+        && (data.scheduledAt == null || data.scheduledAt is timestamp)
+        && (data.targetDurationMinutes == null
+          || isIntInRange(data.targetDurationMinutes, 0, 1440))
+        && isObjectiveIds(data.objectiveIds)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isBlockFields(data) {
+      return hasExactKeys(data, [
+          'title',
+          'description',
+          'docLinks',
+          'objectiveId',
+          'durationMinutes',
+          'order'
+        ])
+        && isBoundedString(data.title, 200)
+        && isBoundedString(data.description, 5000)
+        && isDocLinks(data.docLinks)
+        && isObjectiveIdOrEmpty(data.objectiveId)
+        && isIntInRange(data.durationMinutes, 0, 1440)
+        && isIntInRange(data.order, 0, 200);
+    }
+
+    function meetingOwnedBy(uid) {
+      return exists(/databases/$(database)/documents/meetings/$(meetingId))
+        && get(/databases/$(database)/documents/meetings/$(meetingId)).data.ownerId
+          == uid;
+    }
+
     match /users/{uid} {
-      allow read, write: if isOwner(uid);
+      allow read: if isOwner(uid);
+
+      allow create: if isOwner(uid)
+        && isUserFields(request.resource.data)
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.createdAt == request.time;
+
+      allow update: if isOwner(uid)
+        && isUserFields(request.resource.data)
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.createdAt == resource.data.createdAt;
+
+      allow delete: if false;
     }
 
     match /meetings/{meetingId} {
+      allow read: if isSignedIn()
+        && resource.data.ownerId == request.auth.uid;
+
       allow create: if isSignedIn()
-        && request.resource.data.ownerId == request.auth.uid;
-      allow read, update, delete: if isSignedIn()
+        && isMeetingFields(request.resource.data)
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+
+      allow update: if isSignedIn()
+        && resource.data.ownerId == request.auth.uid
+        && isMeetingFields(request.resource.data)
+        && request.resource.data.ownerId == resource.data.ownerId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.updatedAt == request.time;
+
+      allow delete: if isSignedIn()
         && resource.data.ownerId == request.auth.uid;
 
       match /blocks/{blockId} {
-        allow read, write: if isSignedIn()
-          && get(/databases/$(database)/documents/meetings/$(meetingId)).data.ownerId
-            == request.auth.uid;
+        allow read: if isSignedIn() && meetingOwnedBy(request.auth.uid);
+
+        allow create, update: if isSignedIn()
+          && meetingOwnedBy(request.auth.uid)
+          && isBlockFields(request.resource.data);
+
+        allow delete: if isSignedIn() && meetingOwnedBy(request.auth.uid);
       }
     }
   }

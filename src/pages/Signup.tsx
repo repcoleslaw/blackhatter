@@ -60,6 +60,7 @@ export function SignupPage() {
               type="text"
               required
               autoComplete="name"
+              maxLength={80}
               className="w-full rounded-md border border-line bg-card px-3 py-2 outline-none ring-ember/30 focus:ring-2"
             />
           </label>
