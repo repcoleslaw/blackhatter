@@ -3,6 +3,7 @@ import { AppShell } from "../components/AppShell";
 import { useAuth } from "../features/auth/AuthContext";
 import { authErrorMessage } from "../features/auth/authErrors";
 import { listMeetings } from "../features/meetings/meetingService";
+import { isHttpsUrl } from "../lib/urls";
 
 export function ProfilePage() {
   const { user, profile, updateDisplayName } = useAuth();
@@ -59,7 +60,7 @@ export function ProfilePage() {
         </p>
 
         <div className="mt-8 flex items-center gap-4 rounded-xl border border-line bg-card p-5">
-          {profile?.photoURL ? (
+          {profile && isHttpsUrl(profile.photoURL) ? (
             <img
               src={profile.photoURL}
               alt=""
@@ -89,7 +90,8 @@ export function ProfilePage() {
             <span className="mb-1.5 block text-sm font-medium">Display name</span>
             <input
               value={displayName}
-              onChange={(event) => setDisplayName(event.target.value)}
+              onChange={(event) => setDisplayName(event.target.value.slice(0, 80))}
+              maxLength={80}
               className="w-full rounded-md border border-line bg-paper px-3 py-2 outline-none ring-ember/30 focus:ring-2"
             />
           </label>

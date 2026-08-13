@@ -2,8 +2,23 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    match /users/{uid}/{allPaths=**} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+    // Storage is unused in v1 (meetings store https links, not files).
+    // Deny all reads and writes until an upload feature exists.
+    match /{allPaths=**} {
+      allow read, write: if false;
     }
+
+    // When avatars are added, replace the deny-all match above with:
+    //
+    // match /users/{uid}/avatar {
+    //   allow read: if request.auth != null && request.auth.uid == uid;
+    //   allow write: if request.auth != null
+    //     && request.auth.uid == uid
+    //     && request.resource.size < 1 * 1024 * 1024
+    //     && request.resource.contentType.matches('image/(jpeg|png|webp)');
+    // }
+    //
+    // Never allow image/svg+xml or text/html. contentType is client-declared;
+    // verify magic bytes in a Cloud Function before anyone else can download.
   }
 }

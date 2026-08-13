@@ -2,6 +2,17 @@
   "projects": {
     "staging": "blackhatter"
   },
-  "targets": {},
+  "targets": {
+    "blackhatter": {
+      "hosting": {
+        "app": [
+          "blackhatter"
+        ],
+        "www": [
+          "blackhatter-marketing"
+        ]
+      }
+    }
+  },
   "etags": {}
 }

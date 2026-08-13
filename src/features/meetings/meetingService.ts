@@ -17,12 +17,26 @@ import {
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { requireFirebase } from "../../lib/firebase";
+import { isAllowedDocLinkUrl } from "../../lib/urls";
 import type {
   AgendaBlock,
   DocLink,
   Meeting,
   MeetingUpdates,
 } from "../../types/meeting";
+
+const MAX_DOC_LINKS = 10;
+
+function assertSafeDocLinks(docLinks: DocLink[]) {
+  if (docLinks.length > MAX_DOC_LINKS) {
+    throw new Error("A block can have at most 10 documentation links.");
+  }
+  for (const link of docLinks) {
+    if (!isAllowedDocLinkUrl(link.url)) {
+      throw new Error("Documentation links must use https:// URLs.");
+    }
+  }
+}
 
 function toDate(value: unknown): Date | null {
   if (
@@ -180,6 +194,7 @@ export async function addBlock(
   meetingId: string,
   input: Omit<AgendaBlock, "id">,
 ): Promise<string> {
+  assertSafeDocLinks(input.docLinks);
   const ref = await addDoc(blocksCollection(meetingId), {
     title: input.title,
     description: input.description,
@@ -199,6 +214,9 @@ export async function updateBlock(
   blockId: string,
   updates: Partial<Omit<AgendaBlock, "id">>,
 ): Promise<void> {
+  if (updates.docLinks) {
+    assertSafeDocLinks(updates.docLinks);
+  }
   await updateDoc(doc(blocksCollection(meetingId), blockId), updates);
   await updateDoc(doc(requireFirebase().db, "meetings", meetingId), {
     updatedAt: serverTimestamp(),

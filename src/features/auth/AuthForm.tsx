@@ -1,5 +1,18 @@
 import type { FormEvent, ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { marketingOrigin } from "../../lib/origins";
+
+function BrandMark({ className }: { className: string }) {
+  if (marketingOrigin) {
+    return (
+      <a href={marketingOrigin} className={className}>
+        Blackhatter
+      </a>
+    );
+  }
+
+  return <p className={className}>Blackhatter</p>;
+}
 
 export function AuthLayout({
   title,
@@ -14,9 +27,7 @@ export function AuthLayout({
     <div className="grid min-h-svh lg:grid-cols-[1.1fr_1fr]">
       <aside className="relative hidden overflow-hidden bg-ink px-12 py-16 text-paper lg:flex lg:flex-col lg:justify-between">
         <div>
-          <p className="text-xs font-medium tracking-[0.28em] text-ember uppercase">
-            Blackhatter
-          </p>
+          <BrandMark className="text-xs font-medium tracking-[0.28em] text-ember uppercase" />
           <h1 className="mt-10 max-w-md font-serif text-5xl leading-tight">
             Pressure-test the meeting before anyone sits down.
           </h1>
@@ -25,15 +36,22 @@ export function AuthLayout({
             export a pre-read and a calendar hold.
           </p>
         </div>
-        <p className="text-sm text-white/40">Meeting quality, by design.</p>
+        {marketingOrigin ? (
+          <a
+            href={marketingOrigin}
+            className="text-sm text-white/40 underline-offset-2 hover:text-white/70 hover:underline"
+          >
+            Learn more
+          </a>
+        ) : (
+          <p className="text-sm text-white/40">Meeting quality, by design.</p>
+        )}
         <div className="pointer-events-none absolute -right-16 -bottom-20 h-72 w-72 rounded-full border border-ember/40" />
       </aside>
       <section className="flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-md">
           <div className="mb-8 lg:hidden">
-            <p className="text-xs font-medium tracking-[0.28em] text-ember uppercase">
-              Blackhatter
-            </p>
+            <BrandMark className="text-xs font-medium tracking-[0.28em] text-ember uppercase" />
           </div>
           <h2 className="font-serif text-3xl">{title}</h2>
           <p className="mt-2 text-muted">{subtitle}</p>
