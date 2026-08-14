@@ -13,6 +13,14 @@ export type AgendaBlock = {
   order: number;
 };
 
+export type Participant = {
+  id: string;
+  role: string;
+  company: string;
+  rate: number;
+  order: number;
+};
+
 export type Meeting = {
   id: string;
   ownerId: string;

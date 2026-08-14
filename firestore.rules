@@ -122,6 +122,18 @@ service cloud.firestore {
         && data.updatedAt is timestamp;
     }
 
+    function isNonNegativeNumber(value, max) {
+      return value is number && value >= 0 && value <= max;
+    }
+
+    function isParticipantFields(data) {
+      return hasExactKeys(data, ['role', 'company', 'rate', 'order'])
+        && isBoundedString(data.role, 100)
+        && isBoundedString(data.company, 100)
+        && isNonNegativeNumber(data.rate, 100000)
+        && isIntInRange(data.order, 0, 200);
+    }
+
     function isBlockFields(data) {
       return hasExactKeys(data, [
           'title',
@@ -139,9 +151,9 @@ service cloud.firestore {
         && isIntInRange(data.order, 0, 200);
     }
 
-    function meetingOwnedBy(uid) {
-      return exists(/databases/$(database)/documents/meetings/$(meetingId))
-        && get(/databases/$(database)/documents/meetings/$(meetingId)).data.ownerId
+    function meetingOwnedBy(uid, id) {
+      return exists(/databases/$(database)/documents/meetings/$(id))
+        && get(/databases/$(database)/documents/meetings/$(id)).data.ownerId
           == uid;
     }
 
@@ -182,13 +194,23 @@ service cloud.firestore {
         && resource.data.ownerId == request.auth.uid;
 
       match /blocks/{blockId} {
-        allow read: if isSignedIn() && meetingOwnedBy(request.auth.uid);
+        allow read: if isSignedIn() && meetingOwnedBy(request.auth.uid, meetingId);
 
         allow create, update: if isSignedIn()
-          && meetingOwnedBy(request.auth.uid)
+          && meetingOwnedBy(request.auth.uid, meetingId)
           && isBlockFields(request.resource.data);
 
-        allow delete: if isSignedIn() && meetingOwnedBy(request.auth.uid);
+        allow delete: if isSignedIn() && meetingOwnedBy(request.auth.uid, meetingId);
+      }
+
+      match /participants/{participantId} {
+        allow read: if isSignedIn() && meetingOwnedBy(request.auth.uid, meetingId);
+
+        allow create, update: if isSignedIn()
+          && meetingOwnedBy(request.auth.uid, meetingId)
+          && isParticipantFields(request.resource.data);
+
+        allow delete: if isSignedIn() && meetingOwnedBy(request.auth.uid, meetingId);
       }
     }
   }

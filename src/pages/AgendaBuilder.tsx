@@ -1,25 +1,29 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
+import { MeetingDetails } from "../features/meetings/MeetingDetails";
+import { ParticipantsModal } from "../features/meetings/ParticipantsModal";
 import { AgendaTimeline } from "../features/agenda/AgendaTimeline";
 import { ObjectivesPicker } from "../features/agenda/ObjectivesPicker";
 import { MeetingAnalytics } from "../features/analytics/MeetingAnalytics";
 import { analyzeMeeting } from "../features/analytics/analyzeMeeting";
+import { calculateMeetingCost } from "../features/analytics/calculateMeetingCost";
 import { useAuth } from "../features/auth/AuthContext";
 import { IcsDateModal } from "../features/export/IcsDateModal";
 import { downloadMeetingIcs } from "../features/export/exportIcs";
-import { fromDatetimeLocal, toDatetimeLocal } from "../lib/dates";
 import {
   addBlock,
   deleteBlock,
   reorderBlocks,
+  saveParticipants,
   subscribeToBlocks,
   subscribeToMeeting,
+  subscribeToParticipants,
   updateBlock,
   updateMeeting,
 } from "../features/meetings/meetingService";
-import { formatDuration, sumDurationMinutes } from "../lib/duration";
-import type { AgendaBlock, Meeting } from "../types/meeting";
+import { sumDurationMinutes } from "../lib/duration";
+import type { AgendaBlock, Meeting, Participant } from "../types/meeting";
 
 export function AgendaBuilderPage() {
   const { id } = useParams();
@@ -27,9 +31,11 @@ export function AgendaBuilderPage() {
   const navigate = useNavigate();
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [blocks, setBlocks] = useState<AgendaBlock[]>([]);
+  const [participants, setParticipants] = useState<Participant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [icsOpen, setIcsOpen] = useState(false);
+  const [participantsOpen, setParticipantsOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const pendingBlockUpdates = useRef<Record<string, Partial<AgendaBlock>>>({});
   const blockTimers = useRef<Record<string, number>>({});
@@ -53,9 +59,11 @@ export function AgendaBuilderPage() {
         ),
       );
     });
+    const unsubParticipants = subscribeToParticipants(id, setParticipants);
     return () => {
       unsubMeeting();
       unsubBlocks();
+      unsubParticipants();
       for (const timer of Object.values(timers)) {
         window.clearTimeout(timer);
       }
@@ -65,6 +73,11 @@ export function AgendaBuilderPage() {
   const analysis = useMemo(
     () => (meeting ? analyzeMeeting(meeting, blocks) : null),
     [meeting, blocks],
+  );
+  const actualMinutes = useMemo(() => sumDurationMinutes(blocks), [blocks]);
+  const cost = useMemo(
+    () => calculateMeetingCost(participants, actualMinutes),
+    [participants, actualMinutes],
   );
 
   if (loading) {
@@ -87,8 +100,6 @@ export function AgendaBuilderPage() {
       </AppShell>
     );
   }
-
-  const actualMinutes = sumDurationMinutes(blocks);
 
   async function patchMeeting(updates: Parameters<typeof updateMeeting>[1]) {
     if (!id) return;
@@ -188,6 +199,19 @@ export function AgendaBuilderPage() {
     }
   }
 
+  async function handleSaveParticipants(next: Participant[]) {
+    if (!id) return;
+    setParticipantsOpen(false);
+    setParticipants(next);
+    try {
+      await saveParticipants(id, next);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not save participants.",
+      );
+    }
+  }
+
   return (
     <AppShell>
       <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6">
@@ -199,88 +223,17 @@ export function AgendaBuilderPage() {
           ← Meetings
         </button>
 
-        <header className="mt-4 grid gap-4 rounded-xl border border-line bg-card p-5 lg:grid-cols-[1fr_auto]">
-          <div className="min-w-0 space-y-3">
-            <input
-              value={meeting.title}
-              onChange={(event) =>
-                setMeeting({ ...meeting, title: event.target.value })
-              }
-              onBlur={() => void patchMeeting({ title: meeting.title.trim() })}
-              className="w-full bg-transparent font-serif text-3xl outline-none"
-            />
-            <textarea
-              value={meeting.description}
-              onChange={(event) =>
-                setMeeting({ ...meeting, description: event.target.value })
-              }
-              onBlur={() => void patchMeeting({ description: meeting.description })}
-              rows={2}
-              className="w-full resize-y bg-transparent text-muted outline-none"
-              placeholder="Meeting description"
-            />
-            <div className="flex flex-wrap gap-4">
-              <label className="text-sm">
-                <span className="mb-1 block text-xs text-muted">Date</span>
-                <input
-                  type="datetime-local"
-                  value={
-                    meeting.scheduledAt
-                      ? toDatetimeLocal(meeting.scheduledAt)
-                      : ""
-                  }
-                  onChange={(event) => {
-                    const next = fromDatetimeLocal(event.target.value);
-                    setMeeting({ ...meeting, scheduledAt: next });
-                    void patchMeeting({ scheduledAt: next });
-                  }}
-                  className="rounded-md border border-line bg-paper px-3 py-1.5 text-sm"
-                />
-              </label>
-              <label className="text-sm">
-                <span className="mb-1 block text-xs text-muted">
-                  Target duration (min)
-                </span>
-                <input
-                  type="number"
-                  min={0}
-                  value={meeting.targetDurationMinutes ?? ""}
-                  onChange={(event) => {
-                    const raw = event.target.value;
-                    const next = raw === "" ? null : Math.max(0, Number(raw) || 0);
-                    setMeeting({ ...meeting, targetDurationMinutes: next });
-                    void patchMeeting({ targetDurationMinutes: next });
-                  }}
-                  placeholder="Optional"
-                  className="w-36 rounded-md border border-line bg-paper px-3 py-1.5 text-sm"
-                />
-              </label>
-              <p className="self-end text-sm text-muted">
-                Actual duration{" "}
-                <span className="font-medium text-ink">
-                  {formatDuration(actualMinutes)}
-                </span>
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-start gap-2 lg:flex-col lg:items-stretch">
-            <button
-              type="button"
-              onClick={() => void handlePdf()}
-              disabled={exporting}
-              className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper disabled:opacity-60"
-            >
-              {exporting ? "Exporting…" : "Export PDF pre-read"}
-            </button>
-            <button
-              type="button"
-              onClick={handleIcsClick}
-              className="rounded-md border border-line px-4 py-2 text-sm"
-            >
-              Export .ics
-            </button>
-          </div>
-        </header>
+        <MeetingDetails
+          meeting={meeting}
+          actualMinutes={actualMinutes}
+          participantCount={participants.length}
+          exporting={exporting}
+          onChange={(next) => setMeeting(next)}
+          onPatch={(updates) => void patchMeeting(updates)}
+          onAddParticipants={() => setParticipantsOpen(true)}
+          onPdf={() => void handlePdf()}
+          onIcs={handleIcsClick}
+        />
 
         {error ? <p className="mt-3 text-sm text-ember">{error}</p> : null}
 
@@ -300,7 +253,9 @@ export function AgendaBuilderPage() {
             onReorder={(orderedIds) => void handleReorder(orderedIds)}
             onChange={handleChangeBlock}
           />
-          {analysis ? <MeetingAnalytics analysis={analysis} /> : null}
+          {analysis ? (
+            <MeetingAnalytics analysis={analysis} cost={cost} />
+          ) : null}
         </div>
       </div>
 
@@ -309,6 +264,14 @@ export function AgendaBuilderPage() {
           initialDate={new Date()}
           onCancel={() => setIcsOpen(false)}
           onConfirm={(date) => void confirmIcs(date)}
+        />
+      ) : null}
+
+      {participantsOpen ? (
+        <ParticipantsModal
+          initialParticipants={participants}
+          onCancel={() => setParticipantsOpen(false)}
+          onSave={(next) => void handleSaveParticipants(next)}
         />
       ) : null}
     </AppShell>

@@ -170,6 +170,54 @@ describe("blocks", () => {
   });
 });
 
+describe("participants", () => {
+  it("allows an owner to add a participant", async () => {
+    const db = alice().firestore();
+    await assertSucceeds(
+      setDoc(doc(db, "meetings", "m1"), meetingFields("alice")),
+    );
+    await assertSucceeds(
+      setDoc(doc(db, "meetings", "m1", "participants", "p1"), {
+        role: "PM",
+        company: "my company",
+        rate: 100,
+        order: 0,
+      }),
+    );
+  });
+
+  it("denies extra keys on a participant", async () => {
+    const db = alice().firestore();
+    await assertSucceeds(
+      setDoc(doc(db, "meetings", "m1"), meetingFields("alice")),
+    );
+    await assertFails(
+      setDoc(doc(db, "meetings", "m1", "participants", "p1"), {
+        role: "PM",
+        company: "my company",
+        rate: 100,
+        order: 0,
+        email: "pm@example.com",
+      }),
+    );
+  });
+
+  it("denies a negative rate", async () => {
+    const db = alice().firestore();
+    await assertSucceeds(
+      setDoc(doc(db, "meetings", "m1"), meetingFields("alice")),
+    );
+    await assertFails(
+      setDoc(doc(db, "meetings", "m1", "participants", "p1"), {
+        role: "PM",
+        company: "my company",
+        rate: -1,
+        order: 0,
+      }),
+    );
+  });
+});
+
 describe("storage", () => {
   it("denies uploads even for the authenticated owner", async () => {
     const storage = alice().storage();
