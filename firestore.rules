@@ -122,6 +122,20 @@ service cloud.firestore {
         && data.updatedAt is timestamp;
     }
 
+    function isNonNegativeNumber(value, max) {
+      return (value is int || value is float)
+        && value >= 0
+        && value <= max;
+    }
+
+    function isParticipantFields(data) {
+      return hasExactKeys(data, ['role', 'company', 'rate', 'order'])
+        && isBoundedString(data.role, 100)
+        && isBoundedString(data.company, 100)
+        && isNonNegativeNumber(data.rate, 100000)
+        && isIntInRange(data.order, 0, 200);
+    }
+
     function isBlockFields(data) {
       return hasExactKeys(data, [
           'title',
@@ -187,6 +201,16 @@ service cloud.firestore {
         allow create, update: if isSignedIn()
           && meetingOwnedBy(request.auth.uid)
           && isBlockFields(request.resource.data);
+
+        allow delete: if isSignedIn() && meetingOwnedBy(request.auth.uid);
+      }
+
+      match /participants/{participantId} {
+        allow read: if isSignedIn() && meetingOwnedBy(request.auth.uid);
+
+        allow create, update: if isSignedIn()
+          && meetingOwnedBy(request.auth.uid)
+          && isParticipantFields(request.resource.data);
 
         allow delete: if isSignedIn() && meetingOwnedBy(request.auth.uid);
       }

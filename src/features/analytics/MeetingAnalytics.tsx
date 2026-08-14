@@ -1,9 +1,11 @@
+import { MeetingCostCard } from "./MeetingCostCard";
 import { formatDuration } from "../../lib/duration";
 import { cx } from "../../lib/cx";
 import {
   uncoveredLabels,
   type MeetingAnalysis,
 } from "./analyzeMeeting";
+import type { MeetingCost } from "./calculateMeetingCost";
 
 function StubCard({ title, note }: { title: string; note: string }) {
   return (
@@ -19,7 +21,13 @@ function StubCard({ title, note }: { title: string; note: string }) {
   );
 }
 
-export function MeetingAnalytics({ analysis }: { analysis: MeetingAnalysis }) {
+export function MeetingAnalytics({
+  analysis,
+  cost,
+}: {
+  analysis: MeetingAnalysis;
+  cost: MeetingCost;
+}) {
   const uncovered = uncoveredLabels(analysis.uncoveredObjectiveIds);
   const durationCopy =
     analysis.durationStatus === "none"
@@ -97,10 +105,7 @@ export function MeetingAnalytics({ analysis }: { analysis: MeetingAnalysis }) {
       </section>
 
       <section className="space-y-2">
-        <StubCard
-          title="Cost of meeting"
-          note="Estimate attendee time cost from duration and headcount."
-        />
+        <MeetingCostCard cost={cost} />
         <StubCard
           title="Agenda risks"
           note="Flag overloaded blocks, missing owners, and weak objectives."

@@ -77,5 +77,5 @@ Set production `VITE_APP_ORIGIN` in `marketing/.env` (and `VITE_MARKETING_ORIGIN
 - Profile with display name and meeting count
 - Create a meeting with title and description
 - Agenda builder: preset objectives, sortable duration blocks, optional date and target duration
-- Analytics: objective coverage and actual vs target duration (cost, risks, and simulate are stubs)
+- Analytics: objective coverage, actual vs target duration, and meeting cost by company (risks and simulate are stubs)
 - Export PDF pre-read and `.ics` (title, description, total duration)

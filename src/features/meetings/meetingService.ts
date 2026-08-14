@@ -23,9 +23,13 @@ import type {
   DocLink,
   Meeting,
   MeetingUpdates,
+  Participant,
 } from "../../types/meeting";
 
 const MAX_DOC_LINKS = 10;
+export const MAX_PARTICIPANTS = 20;
+export const DEFAULT_PARTICIPANT_COMPANY = "my company";
+export const DEFAULT_PARTICIPANT_RATE = 100;
 
 function assertSafeDocLinks(docLinks: DocLink[]) {
   if (docLinks.length > MAX_DOC_LINKS) {
@@ -92,12 +96,39 @@ function toBlock(snapshot: QueryDocumentSnapshot<DocumentData>): AgendaBlock {
   };
 }
 
+function toParticipant(
+  snapshot: QueryDocumentSnapshot<DocumentData>,
+): Participant {
+  const data = snapshot.data();
+  return {
+    id: snapshot.id,
+    role: String(data.role ?? ""),
+    company: String(data.company ?? DEFAULT_PARTICIPANT_COMPANY),
+    rate: Number(data.rate) || 0,
+    order: Number(data.order) || 0,
+  };
+}
+
 function meetingsCollection() {
   return collection(requireFirebase().db, "meetings");
 }
 
 function blocksCollection(meetingId: string) {
   return collection(requireFirebase().db, "meetings", meetingId, "blocks");
+}
+
+function participantsCollection(meetingId: string) {
+  return collection(requireFirebase().db, "meetings", meetingId, "participants");
+}
+
+export function createDraftParticipant(order: number): Participant {
+  return {
+    id: crypto.randomUUID(),
+    role: "",
+    company: DEFAULT_PARTICIPANT_COMPANY,
+    rate: DEFAULT_PARTICIPANT_RATE,
+    order,
+  };
 }
 
 export async function listMeetings(ownerId: string): Promise<Meeting[]> {
@@ -156,10 +187,16 @@ export async function updateMeeting(
 
 export async function deleteMeeting(meetingId: string): Promise<void> {
   const { db } = requireFirebase();
-  const blocks = await getDocs(blocksCollection(meetingId));
+  const [blocks, participants] = await Promise.all([
+    getDocs(blocksCollection(meetingId)),
+    getDocs(participantsCollection(meetingId)),
+  ]);
   const batch = writeBatch(db);
   for (const block of blocks.docs) {
     batch.delete(block.ref);
+  }
+  for (const participant of participants.docs) {
+    batch.delete(participant.ref);
   }
   batch.delete(doc(db, "meetings", meetingId));
   await batch.commit();
@@ -242,6 +279,53 @@ export async function reorderBlocks(
   orderedIds.forEach((id, index) => {
     batch.update(doc(db, "meetings", meetingId, "blocks", id), { order: index });
   });
+  batch.update(doc(db, "meetings", meetingId), { updatedAt: serverTimestamp() });
+  await batch.commit();
+}
+
+export function subscribeToParticipants(
+  meetingId: string,
+  onNext: (participants: Participant[]) => void,
+): () => void {
+  return onSnapshot(
+    query(participantsCollection(meetingId), orderBy("order")),
+    (snapshot) => {
+      onNext(snapshot.docs.map(toParticipant));
+    },
+  );
+}
+
+export async function saveParticipants(
+  meetingId: string,
+  next: Participant[],
+): Promise<void> {
+  if (next.length > MAX_PARTICIPANTS) {
+    throw new Error(`A meeting can have at most ${MAX_PARTICIPANTS} participants.`);
+  }
+  const { db } = requireFirebase();
+  const existing = await getDocs(participantsCollection(meetingId));
+  const nextIds = new Set(next.map((participant) => participant.id));
+  const batch = writeBatch(db);
+
+  for (const snapshot of existing.docs) {
+    if (!nextIds.has(snapshot.id)) {
+      batch.delete(snapshot.ref);
+    }
+  }
+
+  next.forEach((participant, index) => {
+    const rate = Math.min(100000, Math.max(0, Number(participant.rate) || 0));
+    batch.set(doc(db, "meetings", meetingId, "participants", participant.id), {
+      role: participant.role.trim().slice(0, 100),
+      company: (participant.company.trim() || DEFAULT_PARTICIPANT_COMPANY).slice(
+        0,
+        100,
+      ),
+      rate,
+      order: index,
+    });
+  });
+
   batch.update(doc(db, "meetings", meetingId), { updatedAt: serverTimestamp() });
   await batch.commit();
 }
