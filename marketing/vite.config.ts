@@ -8,6 +8,9 @@ const marketingRoot = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  ssr: {
+    noExternal: ["react-router", "react-router-dom"],
+  },
   server: {
     port: 5174,
     strictPort: true,

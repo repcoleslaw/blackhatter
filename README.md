@@ -69,7 +69,55 @@ npm run build:marketing
 npx firebase deploy --only hosting
 ```
 
-Set production `VITE_APP_ORIGIN` in `marketing/.env` (and `VITE_MARKETING_ORIGIN` in the app `.env`) to the live origins before those builds. Custom domains (`app.` / `www.`) can be attached to each Hosting site later.
+Set production origins **before** those builds:
+
+| File | Variable | Production value |
+|---|---|---|
+| `marketing/.env` | `VITE_APP_ORIGIN` | `https://app.theblackhatter.com` |
+| `marketing/.env` | `VITE_SITE_ORIGIN` | `https://theblackhatter.com` |
+| `.env` | `VITE_MARKETING_ORIGIN` | `https://theblackhatter.com` |
+
+`VITE_SITE_ORIGIN` defaults to `https://theblackhatter.com` if unset, so prerendered canonicals, Open Graph URLs, and the sitemap stay on the public host.
+
+## Custom domains
+
+Canonical marketing URL: **https://theblackhatter.com**. Do not promote `*.web.app`, `www`, or `.ca` once redirects work.
+
+| Host | Hosting site (target) | Role |
+|---|---|---|
+| `theblackhatter.com` | `blackhatter-marketing` (`www`) | Serve marketing |
+| `www.theblackhatter.com` | same | **Redirect** to `theblackhatter.com` |
+| `theblackhatter.ca`, `www.theblackhatter.ca` | same | **Redirect** to `theblackhatter.com` (keep the path) |
+| `app.theblackhatter.com` | `blackhatter` (`app`) | Serve the product |
+| `app.theblackhatter.ca` | same | **Redirect** to `app.theblackhatter.com` |
+
+### Attach domains in Firebase
+
+1. [Firebase Console](https://console.firebase.google.com/) → Hosting → site **blackhatter-marketing** → **Add custom domain**.
+2. Add `theblackhatter.com` and choose to **serve** this site.
+3. Add `www.theblackhatter.com` and choose **Redirect to another domain** → `theblackhatter.com`.
+4. Add `theblackhatter.ca` and `www.theblackhatter.ca` the same way, redirecting to `theblackhatter.com`.
+5. Switch to site **blackhatter**. Add `app.theblackhatter.com` (serve) and `app.theblackhatter.ca` (redirect to `app.theblackhatter.com`).
+
+Firebase prints DNS records after each add:
+
+- **Apex** (`.com` / `.ca`): TXT to prove ownership, then A and AAAA to Firebase IPs.
+- **Subdomains** (`www`, `app`): CNAME to the host Firebase shows (often `ghs.googlehosted.com`), plus TXT if asked.
+
+### Registrar DNS
+
+Enter those records exactly at the registrar for `theblackhatter.com` and `theblackhatter.ca`. Remove any leftover A/AAAA/CNAME that points somewhere else. Wait until each domain shows **Connected** and HTTPS is provisioned (minutes to 24 hours).
+
+Do not configure the same hostname as both “serve” and “redirect”.
+
+`*.web.app` will still respond. Canonical tags and Search Console point Google at `https://theblackhatter.com`; Hosting cannot 301 the default URL without looping the custom domain.
+
+### Search Console and analytics
+
+1. Add a **Domain** property for `theblackhatter.com` (DNS TXT). This covers apex, `www`, and `app`.
+2. Optionally add `theblackhatter.ca` only to confirm the 301s. Do **not** submit a sitemap there.
+3. Submit `https://theblackhatter.com/sitemap.xml`. Request indexing for `/` and `/faq`.
+4. Optional GA4: set `VITE_GA_MEASUREMENT_ID` in `marketing/.env` and rebuild. Optional HTML-tag verification: set `VITE_GOOGLE_SITE_VERIFICATION`.
 
 ## Product (v1)
 

@@ -1,5 +1,4 @@
 import { appHref } from "../lib/appUrl";
-import { usePageTitle } from "../lib/usePageTitle";
 import { PageIntro, PageWidth } from "../components/Page";
 
 const included = [
@@ -11,8 +10,6 @@ const included = [
 ];
 
 export function PricingPage() {
-  usePageTitle("Pricing");
-
   return (
     <PageWidth>
       <PageIntro kicker="Pricing" title="Free while we are in early access.">

@@ -1,17 +1,15 @@
 import { appHref } from "../lib/appUrl";
-import { usePageTitle } from "../lib/usePageTitle";
 import { PageIntro, PageWidth } from "../components/Page";
 
 export function AboutPage() {
-  usePageTitle("About");
-
   return (
     <PageWidth>
       <PageIntro kicker="About" title="Meetings fail in the design, not the room.">
         <p>
-          Blackhatter is a web app for evaluating meeting quality. You design an
-          agenda against preset objectives, check whether the meeting actually
-          covers them, then export a PDF pre-read and a calendar .ics.
+          Blackhatter is a web app for evaluating meeting quality — a meeting
+          agenda builder, not a security or hacking tool. You design an agenda
+          against preset objectives, check whether the meeting actually covers
+          them, then export a PDF pre-read and a calendar .ics.
         </p>
       </PageIntro>
 

@@ -34,6 +34,9 @@ export function SiteShell() {
             <NavLink to="/about" className={navClass}>
               About
             </NavLink>
+            <NavLink to="/guides" className={navClass}>
+              Guides
+            </NavLink>
             <NavLink to="/faq" className={navClass}>
               FAQ
             </NavLink>
@@ -76,6 +79,9 @@ export function SiteShell() {
             <NavLink to="/about" className={mobileNavClass} onClick={() => setOpen(false)}>
               About
             </NavLink>
+            <NavLink to="/guides" className={mobileNavClass} onClick={() => setOpen(false)}>
+              Guides
+            </NavLink>
             <NavLink to="/faq" className={mobileNavClass} onClick={() => setOpen(false)}>
               FAQ
             </NavLink>
@@ -113,6 +119,9 @@ export function SiteShell() {
             </NavLink>
             <NavLink to="/about" className="text-muted hover:text-ink">
               About
+            </NavLink>
+            <NavLink to="/guides" className="text-muted hover:text-ink">
+              Guides
             </NavLink>
             <NavLink to="/faq" className="text-muted hover:text-ink">
               FAQ

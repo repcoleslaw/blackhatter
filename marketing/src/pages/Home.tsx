@@ -1,5 +1,5 @@
+import { Link } from "react-router-dom";
 import { appHref } from "../lib/appUrl";
-import { usePageTitle } from "../lib/usePageTitle";
 
 const features = [
   {
@@ -39,8 +39,6 @@ const steps = [
 ];
 
 export function HomePage() {
-  usePageTitle();
-
   return (
     <>
       <section className="bg-ink text-paper">
@@ -53,8 +51,8 @@ export function HomePage() {
               Pressure-test the meeting before anyone sits down.
             </h1>
             <p className="mt-6 max-w-lg text-lg text-white/70">
-              Build an agenda against real objectives, see what is missing, then
-              export a pre-read and a calendar hold.
+              Build a meeting agenda against real objectives, see what is
+              missing, then export a pre-read and a calendar hold.
             </p>
             <div className="mt-10 flex flex-wrap gap-3">
               <a
@@ -103,9 +101,17 @@ export function HomePage() {
           The meeting should earn the calendar hold.
         </h2>
         <p className="mt-4 max-w-xl text-muted">
-          Blackhatter is a workspace for designing the agenda, checking it
-          against what you said the meeting was for, and sending people something
-          they can actually use.
+          Blackhatter is a meeting agenda builder for designing the hour,
+          checking it against what you said the meeting was for, and sending
+          people something they can actually use. It is not a security product.
+        </p>
+        <p className="mt-4 text-sm">
+          <Link
+            to="/guides"
+            className="font-medium text-ink underline-offset-2 hover:underline"
+          >
+            Read the meeting design guides
+          </Link>
         </p>
         <div className="mt-12 grid gap-4 sm:grid-cols-2">
           {features.map((feature) => (

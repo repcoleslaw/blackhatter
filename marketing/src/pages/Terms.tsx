@@ -1,9 +1,6 @@
-import { usePageTitle } from "../lib/usePageTitle";
 import { PageIntro, PageWidth } from "../components/Page";
 
 export function TermsPage() {
-  usePageTitle("Terms");
-
   return (
     <PageWidth>
       <PageIntro kicker="Terms" title="Placeholder terms of use.">

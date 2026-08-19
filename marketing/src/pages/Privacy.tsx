@@ -1,9 +1,6 @@
-import { usePageTitle } from "../lib/usePageTitle";
 import { PageIntro, PageWidth } from "../components/Page";
 
 export function PrivacyPage() {
-  usePageTitle("Privacy");
-
   return (
     <PageWidth>
       <PageIntro kicker="Privacy" title="Placeholder privacy notice.">
