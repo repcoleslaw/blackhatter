@@ -1,6 +1,6 @@
-import { getObjective } from "../../lib/objectives";
+import { getMeetingObjective, isValidBlockObjective } from "../../lib/objectives";
 import { sumDurationMinutes } from "../../lib/duration";
-import type { AgendaBlock, Meeting } from "../../types/meeting";
+import type { AgendaBlock, Meeting, MeetingObjective } from "../../types/meeting";
 
 export type DurationStatus = "none" | "under" | "on" | "over";
 
@@ -18,14 +18,14 @@ export function analyzeMeeting(
   meeting: Meeting,
   blocks: AgendaBlock[],
 ): MeetingAnalysis {
-  const selected = meeting.objectiveIds;
+  const selected = meeting.objectives.map((objective) => objective.id);
   const validBlocks = blocks.filter((block) =>
     selected.includes(block.objectiveId),
   );
   const covered = new Set(validBlocks.map((block) => block.objectiveId));
   const uncoveredObjectiveIds = selected.filter((id) => !covered.has(id));
   const invalidBlocks = blocks.filter(
-    (block) => !block.objectiveId || !selected.includes(block.objectiveId),
+    (block) => !isValidBlockObjective(block.objectiveId, meeting.objectives),
   );
   const actualMinutes = sumDurationMinutes(blocks);
   const targetMinutes = meeting.targetDurationMinutes;
@@ -47,6 +47,9 @@ export function analyzeMeeting(
   };
 }
 
-export function uncoveredLabels(ids: string[]): string[] {
-  return ids.map((id) => getObjective(id)?.label ?? id);
+export function uncoveredLabels(
+  ids: string[],
+  objectives: MeetingObjective[],
+): string[] {
+  return ids.map((id) => getMeetingObjective(objectives, id)?.title ?? id);
 }

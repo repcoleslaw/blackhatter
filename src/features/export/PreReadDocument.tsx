@@ -6,7 +6,11 @@ import {
   View,
 } from "@react-pdf/renderer";
 import { formatClockOffset, formatDuration, sumDurationMinutes } from "../../lib/duration";
-import { getObjective } from "../../lib/objectives";
+import {
+  getCategory,
+  getMeetingObjective,
+  isObjectiveNa,
+} from "../../lib/objectives";
 import type { AgendaBlock, Meeting } from "../../types/meeting";
 
 const styles = StyleSheet.create({
@@ -74,15 +78,15 @@ export function PreReadDocument({
 
         <View style={styles.section}>
           <Text style={styles.heading}>Objectives</Text>
-          {meeting.objectiveIds.length === 0 ? (
+          {meeting.objectives.length === 0 ? (
             <Text style={styles.muted}>No objectives selected.</Text>
           ) : (
-            meeting.objectiveIds.map((id) => {
-              const objective = getObjective(id);
+            meeting.objectives.map((objective) => {
+              const category = getCategory(objective.categoryId);
               return (
-                <Text key={id} style={styles.chip}>
-                  • {objective?.label ?? id}
-                  {objective ? ` — ${objective.description}` : ""}
+                <Text key={objective.id} style={styles.chip}>
+                  • {objective.title}
+                  {category ? ` — ${category.label}` : ""}
                 </Text>
               );
             })
@@ -106,7 +110,13 @@ export function PreReadDocument({
                     </Text>
                     {block.description ? <Text>{block.description}</Text> : null}
                     <Text style={styles.muted}>
-                      Objective: {getObjective(block.objectiveId)?.label ?? "Unassigned"}
+                      Objective:{" "}
+                      {isObjectiveNa(block.objectiveId)
+                        ? "N/A"
+                        : getMeetingObjective(
+                            meeting.objectives,
+                            block.objectiveId,
+                          )?.title ?? "Unassigned"}
                     </Text>
                     {block.docLinks
                       .filter((link) => link.url)

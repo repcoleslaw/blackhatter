@@ -3,6 +3,12 @@ export type DocLink = {
   url: string;
 };
 
+export type MeetingObjective = {
+  id: string;
+  title: string;
+  categoryId: string;
+};
+
 export type AgendaBlock = {
   id: string;
   title: string;
@@ -28,7 +34,7 @@ export type Meeting = {
   description: string;
   scheduledAt: Date | null;
   targetDurationMinutes: number | null;
-  objectiveIds: string[];
+  objectives: MeetingObjective[];
   createdAt: Date;
   updatedAt: Date;
 };
@@ -48,6 +54,6 @@ export type MeetingUpdates = Partial<
     | "description"
     | "scheduledAt"
     | "targetDurationMinutes"
-    | "objectiveIds"
+    | "objectives"
   >
 >;

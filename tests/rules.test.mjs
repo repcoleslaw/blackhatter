@@ -48,7 +48,7 @@ function meetingFields(ownerId, extra = {}) {
     description: "Weekly",
     scheduledAt: null,
     targetDurationMinutes: null,
-    objectiveIds: [],
+    objectives: [],
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     ...extra,
@@ -140,6 +140,38 @@ describe("meetings", () => {
         ownerId: "bob",
         updatedAt: serverTimestamp(),
       }),
+    );
+  });
+
+  it("allows custom meeting objectives", async () => {
+    const db = alice().firestore();
+    await assertSucceeds(
+      setDoc(
+        doc(db, "meetings", "m1"),
+        meetingFields("alice", {
+          objectives: [
+            {
+              id: "obj-1",
+              title: "Approve hiring plan",
+              categoryId: "decide",
+            },
+          ],
+        }),
+      ),
+    );
+  });
+
+  it("denies an unknown objective category", async () => {
+    const db = alice().firestore();
+    await assertFails(
+      setDoc(
+        doc(db, "meetings", "m1"),
+        meetingFields("alice", {
+          objectives: [
+            { id: "obj-1", title: "Ship it", categoryId: "unknown" },
+          ],
+        }),
+      ),
     );
   });
 });

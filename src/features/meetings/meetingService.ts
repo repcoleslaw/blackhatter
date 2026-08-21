@@ -2,6 +2,7 @@ import {
   addDoc,
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -17,11 +18,13 @@ import {
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { requireFirebase } from "../../lib/firebase";
+import { getCategory, MAX_OBJECTIVES } from "../../lib/objectives";
 import { isAllowedDocLinkUrl } from "../../lib/urls";
 import type {
   AgendaBlock,
   DocLink,
   Meeting,
+  MeetingObjective,
   MeetingUpdates,
   Participant,
 } from "../../types/meeting";
@@ -54,6 +57,73 @@ function toDate(value: unknown): Date | null {
   return null;
 }
 
+function toObjectives(data: DocumentData): MeetingObjective[] {
+  if (Array.isArray(data.objectives)) {
+    return data.objectives
+      .map((item: unknown) => {
+        const objective = (item ?? {}) as Record<string, unknown>;
+        return {
+          id: String(objective.id ?? ""),
+          title: String(objective.title ?? ""),
+          categoryId: String(objective.categoryId ?? ""),
+        };
+      })
+      .filter((objective) => objective.id);
+  }
+  if (Array.isArray(data.objectiveIds)) {
+    return data.objectiveIds.map(String).map((id) => {
+      const category = getCategory(id);
+      return {
+        id,
+        title: category?.label ?? id,
+        categoryId: id,
+      };
+    });
+  }
+  return [];
+}
+
+function serializeObjectives(objectives: MeetingObjective[]): MeetingObjective[] {
+  if (objectives.length > MAX_OBJECTIVES) {
+    throw new Error(`A meeting can have at most ${MAX_OBJECTIVES} objectives.`);
+  }
+  return objectives.map((objective) => {
+    const title = objective.title.trim().slice(0, 200);
+    if (!objective.id || !title || !getCategory(objective.categoryId)) {
+      throw new Error("Each objective needs a title and category.");
+    }
+    return {
+      id: objective.id.slice(0, 64),
+      title,
+      categoryId: objective.categoryId,
+    };
+  });
+}
+
+function meetingTouchPayload(
+  snapshot: QueryDocumentSnapshot<DocumentData>,
+): Record<string, unknown> {
+  const data = snapshot.data();
+  const payload: Record<string, unknown> = {
+    updatedAt: serverTimestamp(),
+  };
+  if (!Array.isArray(data.objectives) || data.objectiveIds !== undefined) {
+    payload.objectives = serializeObjectives(toObjectives(data));
+    payload.objectiveIds = deleteField();
+  }
+  return payload;
+}
+
+async function touchMeeting(meetingId: string): Promise<void> {
+  const ref = doc(requireFirebase().db, "meetings", meetingId);
+  const snapshot = await getDoc(ref);
+  if (!snapshot.exists()) return;
+  await updateDoc(
+    ref,
+    meetingTouchPayload(snapshot as QueryDocumentSnapshot<DocumentData>),
+  );
+}
+
 function toMeeting(snapshot: QueryDocumentSnapshot<DocumentData>): Meeting {
   const data = snapshot.data();
   return {
@@ -66,9 +136,7 @@ function toMeeting(snapshot: QueryDocumentSnapshot<DocumentData>): Meeting {
       typeof data.targetDurationMinutes === "number"
         ? data.targetDurationMinutes
         : null,
-    objectiveIds: Array.isArray(data.objectiveIds)
-      ? data.objectiveIds.map(String)
-      : [],
+    objectives: toObjectives(data),
     createdAt: toDate(data.createdAt) ?? new Date(0),
     updatedAt: toDate(data.updatedAt) ?? new Date(0),
   };
@@ -157,7 +225,7 @@ export async function createMeeting(input: {
     description: input.description.trim(),
     scheduledAt: null,
     targetDurationMinutes: null,
-    objectiveIds: [],
+    objectives: [],
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
@@ -168,12 +236,20 @@ export async function updateMeeting(
   meetingId: string,
   updates: MeetingUpdates,
 ): Promise<void> {
+  const ref = doc(requireFirebase().db, "meetings", meetingId);
+  const snapshot = await getDoc(ref);
+  if (!snapshot.exists()) {
+    throw new Error("Meeting not found.");
+  }
+  const current = toMeeting(snapshot as QueryDocumentSnapshot<DocumentData>);
+  const objectives = serializeObjectives(updates.objectives ?? current.objectives);
   const payload: Record<string, unknown> = {
     updatedAt: serverTimestamp(),
+    objectives,
+    objectiveIds: deleteField(),
   };
   if (updates.title !== undefined) payload.title = updates.title;
   if (updates.description !== undefined) payload.description = updates.description;
-  if (updates.objectiveIds !== undefined) payload.objectiveIds = updates.objectiveIds;
   if (updates.targetDurationMinutes !== undefined) {
     payload.targetDurationMinutes = updates.targetDurationMinutes;
   }
@@ -182,7 +258,7 @@ export async function updateMeeting(
       ? Timestamp.fromDate(updates.scheduledAt)
       : null;
   }
-  await updateDoc(doc(requireFirebase().db, "meetings", meetingId), payload);
+  await updateDoc(ref, payload);
 }
 
 export async function deleteMeeting(meetingId: string): Promise<void> {
@@ -240,9 +316,7 @@ export async function addBlock(
     durationMinutes: input.durationMinutes,
     order: input.order,
   });
-  await updateDoc(doc(requireFirebase().db, "meetings", meetingId), {
-    updatedAt: serverTimestamp(),
-  });
+  await touchMeeting(meetingId);
   return ref.id;
 }
 
@@ -255,9 +329,7 @@ export async function updateBlock(
     assertSafeDocLinks(updates.docLinks);
   }
   await updateDoc(doc(blocksCollection(meetingId), blockId), updates);
-  await updateDoc(doc(requireFirebase().db, "meetings", meetingId), {
-    updatedAt: serverTimestamp(),
-  });
+  await touchMeeting(meetingId);
 }
 
 export async function deleteBlock(
@@ -265,9 +337,7 @@ export async function deleteBlock(
   blockId: string,
 ): Promise<void> {
   await deleteDoc(doc(blocksCollection(meetingId), blockId));
-  await updateDoc(doc(requireFirebase().db, "meetings", meetingId), {
-    updatedAt: serverTimestamp(),
-  });
+  await touchMeeting(meetingId);
 }
 
 export async function reorderBlocks(
@@ -275,11 +345,18 @@ export async function reorderBlocks(
   orderedIds: string[],
 ): Promise<void> {
   const { db } = requireFirebase();
+  const meetingRef = doc(db, "meetings", meetingId);
+  const snapshot = await getDoc(meetingRef);
   const batch = writeBatch(db);
   orderedIds.forEach((id, index) => {
     batch.update(doc(db, "meetings", meetingId, "blocks", id), { order: index });
   });
-  batch.update(doc(db, "meetings", meetingId), { updatedAt: serverTimestamp() });
+  if (snapshot.exists()) {
+    batch.update(
+      meetingRef,
+      meetingTouchPayload(snapshot as QueryDocumentSnapshot<DocumentData>),
+    );
+  }
   await batch.commit();
 }
 
@@ -303,7 +380,11 @@ export async function saveParticipants(
     throw new Error(`A meeting can have at most ${MAX_PARTICIPANTS} participants.`);
   }
   const { db } = requireFirebase();
-  const existing = await getDocs(participantsCollection(meetingId));
+  const meetingRef = doc(db, "meetings", meetingId);
+  const [existing, meetingSnapshot] = await Promise.all([
+    getDocs(participantsCollection(meetingId)),
+    getDoc(meetingRef),
+  ]);
   const nextIds = new Set(next.map((participant) => participant.id));
   const batch = writeBatch(db);
 
@@ -326,6 +407,13 @@ export async function saveParticipants(
     });
   });
 
-  batch.update(doc(db, "meetings", meetingId), { updatedAt: serverTimestamp() });
+  if (meetingSnapshot.exists()) {
+    batch.update(
+      meetingRef,
+      meetingTouchPayload(
+        meetingSnapshot as QueryDocumentSnapshot<DocumentData>,
+      ),
+    );
+  }
   await batch.commit();
 }

@@ -37,7 +37,7 @@ service cloud.firestore {
       return value == null || isHttpsUrlOrEmpty(value, maxLen);
     }
 
-    function isObjectiveId(id) {
+    function isCategoryId(id) {
       return id in [
         'decide',
         'align',
@@ -50,23 +50,44 @@ service cloud.firestore {
       ];
     }
 
-    function isObjectiveIdOrEmpty(id) {
-      return id is string && (id.size() == 0 || isObjectiveId(id));
+    function isMeetingObjective(item) {
+      return item is map
+        && item.keys().hasOnly(['id', 'title', 'categoryId'])
+        && item.keys().size() == 3
+        && isBoundedString(item.id, 64)
+        && item.id.size() > 0
+        && isBoundedString(item.title, 200)
+        && item.title.size() > 0
+        && isCategoryId(item.categoryId);
     }
 
-    function isObjectiveIds(ids) {
-      return ids is list
-        && ids.size() <= 8
-        && ids.hasOnly([
-          'decide',
-          'align',
-          'inform',
-          'ideate',
-          'status',
-          'review',
-          'problem_solve',
-          'plan'
-        ]);
+    function isMeetingObjectives(list) {
+      return list is list
+        && list.size() <= 20
+        && (list.size() < 1 || isMeetingObjective(list[0]))
+        && (list.size() < 2 || isMeetingObjective(list[1]))
+        && (list.size() < 3 || isMeetingObjective(list[2]))
+        && (list.size() < 4 || isMeetingObjective(list[3]))
+        && (list.size() < 5 || isMeetingObjective(list[4]))
+        && (list.size() < 6 || isMeetingObjective(list[5]))
+        && (list.size() < 7 || isMeetingObjective(list[6]))
+        && (list.size() < 8 || isMeetingObjective(list[7]))
+        && (list.size() < 9 || isMeetingObjective(list[8]))
+        && (list.size() < 10 || isMeetingObjective(list[9]))
+        && (list.size() < 11 || isMeetingObjective(list[10]))
+        && (list.size() < 12 || isMeetingObjective(list[11]))
+        && (list.size() < 13 || isMeetingObjective(list[12]))
+        && (list.size() < 14 || isMeetingObjective(list[13]))
+        && (list.size() < 15 || isMeetingObjective(list[14]))
+        && (list.size() < 16 || isMeetingObjective(list[15]))
+        && (list.size() < 17 || isMeetingObjective(list[16]))
+        && (list.size() < 18 || isMeetingObjective(list[17]))
+        && (list.size() < 19 || isMeetingObjective(list[18]))
+        && (list.size() < 20 || isMeetingObjective(list[19]));
+    }
+
+    function isObjectiveIdOrEmpty(id) {
+      return id is string && id.size() <= 64;
     }
 
     function isDocLink(item) {
@@ -107,7 +128,7 @@ service cloud.firestore {
           'description',
           'scheduledAt',
           'targetDurationMinutes',
-          'objectiveIds',
+          'objectives',
           'createdAt',
           'updatedAt'
         ])
@@ -117,7 +138,7 @@ service cloud.firestore {
         && (data.scheduledAt == null || data.scheduledAt is timestamp)
         && (data.targetDurationMinutes == null
           || isIntInRange(data.targetDurationMinutes, 0, 1440))
-        && isObjectiveIds(data.objectiveIds)
+        && isMeetingObjectives(data.objectives)
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
     }

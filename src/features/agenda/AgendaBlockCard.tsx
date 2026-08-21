@@ -1,19 +1,25 @@
 import { useEffect, useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { getObjective } from "../../lib/objectives";
+import {
+  getCategory,
+  getMeetingObjective,
+  isObjectiveNa,
+  isValidBlockObjective,
+  OBJECTIVE_NA_ID,
+} from "../../lib/objectives";
 import { formatDuration } from "../../lib/duration";
 import { cx } from "../../lib/cx";
-import type { AgendaBlock, DocLink } from "../../types/meeting";
+import type { AgendaBlock, DocLink, MeetingObjective } from "../../types/meeting";
 
 export function AgendaBlockCard({
   block,
-  objectiveIds,
+  objectives,
   onChange,
   onDelete,
 }: {
   block: AgendaBlock;
-  objectiveIds: string[];
+  objectives: MeetingObjective[];
   onChange: (updates: Partial<AgendaBlock>) => void;
   onDelete: () => void;
 }) {
@@ -33,8 +39,8 @@ export function AgendaBlockCard({
     setDescription(block.description);
   }, [block.id, block.title, block.description]);
 
-  const invalid =
-    !block.objectiveId || !objectiveIds.includes(block.objectiveId);
+  const assigned = getMeetingObjective(objectives, block.objectiveId);
+  const invalid = !isValidBlockObjective(block.objectiveId, objectives);
 
   function updateLink(index: number, patch: Partial<DocLink>) {
     const docLinks = block.docLinks.map((link, i) =>
@@ -87,7 +93,7 @@ export function AgendaBlockCard({
           </div>
           {invalid ? (
             <p className="text-xs text-ember">
-              This block is not tied to a selected meeting objective.
+              This block needs a meeting objective, or N/A.
             </p>
           ) : null}
           <textarea
@@ -128,15 +134,23 @@ export function AgendaBlockCard({
                 className="w-full rounded-md border border-line bg-paper px-3 py-2 text-sm outline-none ring-ember/30 focus:ring-2"
               >
                 <option value="">Select objective…</option>
-                {objectiveIds.map((id) => (
-                  <option key={id} value={id}>
-                    {getObjective(id)?.label ?? id}
-                  </option>
-                ))}
-                {block.objectiveId && !objectiveIds.includes(block.objectiveId) ? (
+                <option value={OBJECTIVE_NA_ID}>
+                  N/A — intro, break, or courtesy
+                </option>
+                {objectives.map((objective) => {
+                  const category = getCategory(objective.categoryId);
+                  return (
+                    <option key={objective.id} value={objective.id}>
+                      {objective.title}
+                      {category ? ` — ${category.label}` : ""}
+                    </option>
+                  );
+                })}
+                {block.objectiveId &&
+                !assigned &&
+                !isObjectiveNa(block.objectiveId) ? (
                   <option value={block.objectiveId}>
-                    {getObjective(block.objectiveId)?.label ?? block.objectiveId}{" "}
-                    (deselected)
+                    {block.objectiveId} (removed)
                   </option>
                 ) : null}
               </select>

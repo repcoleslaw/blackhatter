@@ -6,6 +6,7 @@ import {
   type MeetingAnalysis,
 } from "./analyzeMeeting";
 import type { MeetingCost } from "./calculateMeetingCost";
+import type { MeetingObjective } from "../../types/meeting";
 
 function StubCard({ title, note }: { title: string; note: string }) {
   return (
@@ -24,11 +25,13 @@ function StubCard({ title, note }: { title: string; note: string }) {
 export function MeetingAnalytics({
   analysis,
   cost,
+  objectives,
 }: {
   analysis: MeetingAnalysis;
   cost: MeetingCost;
+  objectives: MeetingObjective[];
 }) {
-  const uncovered = uncoveredLabels(analysis.uncoveredObjectiveIds);
+  const uncovered = uncoveredLabels(analysis.uncoveredObjectiveIds, objectives);
   const durationCopy =
     analysis.durationStatus === "none"
       ? "Set a target duration to compare against the agenda."
@@ -64,7 +67,7 @@ export function MeetingAnalytics({
           </p>
           <p className="mt-1 text-sm text-muted">
             {analysis.selectedCount === 0
-              ? "Select objectives to start validation."
+              ? "Add objectives to start validation."
               : analysis.objectivesMet
                 ? "Every selected objective has at least one agenda block."
                 : `${uncovered.length} objective${uncovered.length === 1 ? "" : "s"} uncovered.`}
@@ -73,8 +76,8 @@ export function MeetingAnalytics({
 
         {uncovered.length > 0 ? (
           <ul className="mt-3 list-disc space-y-1 pl-5 text-sm">
-            {uncovered.map((label) => (
-              <li key={label}>{label} has no block</li>
+            {analysis.uncoveredObjectiveIds.map((id, index) => (
+              <li key={id}>{uncovered[index]} has no block</li>
             ))}
           </ul>
         ) : null}
