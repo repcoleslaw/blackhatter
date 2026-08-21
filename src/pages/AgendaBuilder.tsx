@@ -116,7 +116,7 @@ export function AgendaBuilderPage() {
       title: "Untitled block",
       description: "",
       docLinks: [],
-      objectiveId: meeting.objectiveIds[0] ?? "",
+      objectiveId: meeting.objectives[0]?.id ?? "",
       durationMinutes: 15,
       order: blocks.length,
     });
@@ -239,22 +239,26 @@ export function AgendaBuilderPage() {
 
         <div className="mt-6 grid gap-6 xl:grid-cols-[260px_minmax(0,1fr)_300px]">
           <ObjectivesPicker
-            selectedIds={meeting.objectiveIds}
-            onChange={(objectiveIds) => {
-              setMeeting({ ...meeting, objectiveIds });
-              void patchMeeting({ objectiveIds });
+            objectives={meeting.objectives}
+            onChange={(objectives) => {
+              setMeeting({ ...meeting, objectives });
+              void patchMeeting({ objectives });
             }}
           />
           <AgendaTimeline
             blocks={blocks}
-            objectiveIds={meeting.objectiveIds}
+            objectives={meeting.objectives}
             onAdd={() => void handleAddBlock()}
             onDelete={(blockId) => void handleDeleteBlock(blockId)}
             onReorder={(orderedIds) => void handleReorder(orderedIds)}
             onChange={handleChangeBlock}
           />
           {analysis ? (
-            <MeetingAnalytics analysis={analysis} cost={cost} />
+            <MeetingAnalytics
+              analysis={analysis}
+              cost={cost}
+              objectives={meeting.objectives}
+            />
           ) : null}
         </div>
       </div>

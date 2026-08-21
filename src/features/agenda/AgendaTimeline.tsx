@@ -12,19 +12,19 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { formatClockOffset, formatDuration, sumDurationMinutes } from "../../lib/duration";
-import type { AgendaBlock } from "../../types/meeting";
+import type { AgendaBlock, MeetingObjective } from "../../types/meeting";
 import { AgendaBlockCard } from "./AgendaBlockCard";
 
 export function AgendaTimeline({
   blocks,
-  objectiveIds,
+  objectives,
   onReorder,
   onChange,
   onDelete,
   onAdd,
 }: {
   blocks: AgendaBlock[];
-  objectiveIds: string[];
+  objectives: MeetingObjective[];
   onReorder: (orderedIds: string[]) => void;
   onChange: (blockId: string, updates: Partial<AgendaBlock>) => void;
   onDelete: (blockId: string) => void;
@@ -99,7 +99,7 @@ export function AgendaTimeline({
                     </p>
                     <AgendaBlockCard
                       block={block}
-                      objectiveIds={objectiveIds}
+                      objectives={objectives}
                       onChange={(updates) => onChange(block.id, updates)}
                       onDelete={() => onDelete(block.id)}
                     />
